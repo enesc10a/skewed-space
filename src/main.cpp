@@ -81,35 +81,51 @@ static void initScene() {
 static void display(float deltaTime) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // 1) physics pass
+    // 1. Physics update (unchanged)
     const float Gscale = 1.0f;
     for (auto* s : spheres) s->computeNetForce();
     for (auto* s : spheres) s->integrate(deltaTime, Gscale);
 
-    // 2) camera matrices
-    mat4 V; {
-        vec4 eye = vec4(cameraPos,1.0f);
-        vec4 at  = vec4(cameraPos + cameraFront,1.0f);
-        vec4 up4 = vec4(cameraUp,0.0f);
-        V = LookAt(eye, at, up4);
-    }
-    int w,h;
+    // 2. Build camera matrices
+    vec4 eye4 = vec4(cameraPos, 1.0f);
+    vec4 at4  = vec4(cameraPos + cameraFront, 1.0f);
+    vec4 up4  = vec4(cameraUp, 0.0f);
+    mat4 V    = LookAt(eye4, at4, up4);
+
+    int w, h;
     glfwGetFramebufferSize(glfwGetCurrentContext(), &w, &h);
-    mat4 P = Perspective(45.0f, float(w)/float(h), 0.1f, 100.0f);
+    mat4 P    = Perspective(45.0f, float(w)/float(h), 0.1f, 100.0f);
 
     setCommonUniforms(V, P);
 
-    // 3) light
-    vec3 lightDir = normalize(vec3(0.5f, 1.0f, 0.3f));
-    glUniform3fv(glGetUniformLocation(shaderProgram, "uLightDir"), 1, &lightDir.x);
+    // 3. Compute Sun→eye‐space once
+    //    (we’ll reuse to compute per-object directional)
+    vec3 sunWorld = spheres[0]->getProperties().position;
+    vec4 sunEye4  = V * vec4(sunWorld, 1.0f);
+    vec3 sunEye   = vec3(sunEye4.x, sunEye4.y, sunEye4.z);
 
-    // 4) draw spheres
+    // locate the uniform once
+    GLint lightDirLoc = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint modelLoc    = glGetUniformLocation(shaderProgram, "model");
+
+    // 4. Draw each sphere with its own uLightDir
     for (size_t i = 0; i < spheres.size(); ++i) {
-        auto& props = spheres[i]->getProperties();
-        mat4 M = Translate(props.position)
-               * Scale(props.radius, props.radius, props.radius);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_TRUE, M);
+        auto& P = spheres[i]->getProperties();
 
+        // compute world→Sun direction for *this* sphere
+        vec3 dirWorld = sunWorld - P.position;
+        // transform to eye space (w=0 so no translation)
+        vec4 dirEye4 = V * vec4(dirWorld, 0.0f);
+        vec3 dirEye  = normalize(vec3(dirEye4.x, dirEye4.y, dirEye4.z));
+
+        // upload that as your single directional light
+        glUniform3fv(lightDirLoc, 1, &dirEye.x);
+
+        // model matrix
+        mat4 M = Translate(P.position) * Scale(P.radius, P.radius, P.radius);
+        glUniformMatrix4fv(modelLoc, 1, GL_TRUE, M);
+
+        // bind texture + draw
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textures[i]);
         spheres[i]->draw();
