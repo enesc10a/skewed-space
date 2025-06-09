@@ -112,11 +112,18 @@ static void display(float deltaTime) {
     
     
     GLint isSunLoc = glGetUniformLocation(shaderProgram, "uIsSun");
-
+    GLint locSunBright = glGetUniformLocation(shaderProgram, "uSunBright");
+    GLint locSunYellow = glGetUniformLocation(shaderProgram, "uSunYellow");
+    float sunBrightVal = 90.5f;
+    float sunYellowVal = 0.4f;
+    
+    
     // 4. Draw each sphere with its own uLightDir
     for (size_t i = 0; i < spheres.size(); ++i) {
         bool isSun = (i == 0);                            // sun is spheres[0]
             glUniform1i(isSunLoc, isSun ? 1 : 0);
+            glUniform1f(locSunBright, sunBrightVal);
+            glUniform1f(locSunYellow, sunYellowVal);
         auto& P = spheres[i]->getProperties();
         
         // compute world→Sun direction for *this* sphere

@@ -3,7 +3,8 @@ in vec3 fNormal;
 in vec2 fTex;
 flat in vec4 fColor;          // matches ‘flat’ qualifier in VS
 uniform bool uIsSun;
-
+uniform float    uSunBright;      // new: e.g. 1.5
+uniform float    uSunYellow;      // new: 0..1 tint amount
 uniform sampler2D uTexture;
 uniform int  uShadingMode;    // 0 = Gouraud, 1 = Phong
 uniform bool uTexturing;      // true in TEXTURED mode
@@ -32,9 +33,10 @@ void main()
     //  Phong: compute per-fragment lighting
     ////////////////////////////////////////////////////////////////////////////
     if (uIsSun) {
-            vec4 texC = texture(uTexture, fTex);
-            // optional: boost brightness, e.g. clamp(texC*1.5,0,1);
-            FragColor = texC;
+            vec4 texC   = texture(uTexture, fTex);
+            vec3 bright = texC.rgb * uSunBright;
+            vec3 tinted = mix(bright, vec3(1.0,1.0,0.0), uSunYellow);
+            FragColor   = vec4(tinted, texC.a);
             return;
         }
     vec3 N = normalize(fNormal);
