@@ -6,6 +6,7 @@ layout(location=2) in vec2 vTex;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform bool uIsSun;
 
 uniform int  uShadingMode;      // 0 = Gouraud, 1 = Phong
 uniform vec3 uLightDir;         // already in eye space

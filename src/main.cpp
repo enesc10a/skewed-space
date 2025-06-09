@@ -27,11 +27,13 @@ static void setCommonUniforms(const mat4& V, const mat4& P) {
     glUniform1i  (glGetUniformLocation(shaderProgram, "uUseAmb"),  1);
     glUniform1i  (glGetUniformLocation(shaderProgram, "uUseDiff"), 1);
     glUniform1i  (glGetUniformLocation(shaderProgram, "uUseSpec"), 1);
+    
 }
 
 static void initScene() {
     shaderProgram = InitShader("shaders/vertex.glsl", "shaders/fragment.glsl");
     glUseProgram(shaderProgram);
+    
 
     // load textures
     textures[0] = loadPPMTexture("resources/sun.ppm");
@@ -107,11 +109,16 @@ static void display(float deltaTime) {
     // locate the uniform once
     GLint lightDirLoc = glGetUniformLocation(shaderProgram, "uLightDir");
     GLint modelLoc    = glGetUniformLocation(shaderProgram, "model");
+    
+    
+    GLint isSunLoc = glGetUniformLocation(shaderProgram, "uIsSun");
 
     // 4. Draw each sphere with its own uLightDir
     for (size_t i = 0; i < spheres.size(); ++i) {
+        bool isSun = (i == 0);                            // sun is spheres[0]
+            glUniform1i(isSunLoc, isSun ? 1 : 0);
         auto& P = spheres[i]->getProperties();
-
+        
         // compute world→Sun direction for *this* sphere
         vec3 dirWorld = sunWorld - P.position;
         // transform to eye space (w=0 so no translation)

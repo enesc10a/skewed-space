@@ -2,6 +2,7 @@
 in vec3 fNormal;
 in vec2 fTex;
 flat in vec4 fColor;          // matches ‘flat’ qualifier in VS
+uniform bool uIsSun;
 
 uniform sampler2D uTexture;
 uniform int  uShadingMode;    // 0 = Gouraud, 1 = Phong
@@ -30,6 +31,12 @@ void main()
     ////////////////////////////////////////////////////////////////////////////
     //  Phong: compute per-fragment lighting
     ////////////////////////////////////////////////////////////////////////////
+    if (uIsSun) {
+            vec4 texC = texture(uTexture, fTex);
+            // optional: boost brightness, e.g. clamp(texC*1.5,0,1);
+            FragColor = texC;
+            return;
+        }
     vec3 N = normalize(fNormal);
     vec3 L = normalize(uLightDir);
     vec3 V = vec3(0.0, 0.0, 1.0);      // eye points down –Z in eye space
