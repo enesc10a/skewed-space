@@ -18,7 +18,7 @@ Angel::vec3 cameraUp    = cameraUpOrig;
 float cameraSpeed = 80.0f;
 
 static std::vector<Sphere*> spheres;
-static GLuint textures[8] = {0}, texSun = 0, texEarth = 0, texMoon = 0,texNeutron=0;
+static GLuint textures[8] = {0}, texSun = 0, texEarth = 0, texMoon = 0,texNeutron=0,texRedSun=0;
 static GLuint rayShader = 0, fsVAO = 0;
 
 // Simulation params
@@ -52,7 +52,7 @@ static void loadWorld(int w) {
         case 0: textures[0]=texSun; textures[1]=texEarth; textures[2]=texMoon; break;
         case 1: textures[0]=texSun; textures[1]=texNeutron;   textures[2]=texEarth; break;
         case 2: textures[0]=texSun; for(int i=1;i<=4;++i) textures[i]=texEarth; break;
-        case 3: textures[0]=texSun; textures[1]=texNeutron; textures[2]=texSun; break;
+        case 3: textures[0]=texSun; textures[1]=texNeutron; textures[2]=texRedSun; break;
     }
     // spheres
     switch(w) {
@@ -118,6 +118,7 @@ static void initScene() {
     texEarth = loadPPMTexture("resources/earth.ppm");
     texMoon  = loadPPMTexture("resources/moon.ppm");
     texNeutron = loadPPMTexture("resources/neutron_star.ppm");
+    texRedSun = loadPPMTexture("resources/red_sun.ppm");
     glEnable(GL_DEPTH_TEST);
     loadWorld(currentWorld);
 }
