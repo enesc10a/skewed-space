@@ -105,7 +105,7 @@ static void display(float deltaTime) {
     vec3 sunWorld = spheres[0]->getProperties().position;
     vec4 sunEye4  = V * vec4(sunWorld, 1.0f);
     vec3 sunEye   = vec3(sunEye4.x, sunEye4.y, sunEye4.z);
-
+    
     // locate the uniform once
     GLint lightDirLoc = glGetUniformLocation(shaderProgram, "uLightDir");
     GLint modelLoc    = glGetUniformLocation(shaderProgram, "model");
@@ -125,12 +125,18 @@ static void display(float deltaTime) {
             glUniform1f(locSunBright, sunBrightVal);
             glUniform1f(locSunYellow, sunYellowVal);
         auto& P = spheres[i]->getProperties();
-        
-        // compute world→Sun direction for *this* sphere
-        vec3 dirWorld = sunWorld - P.position;
+        vec3 dirEye;
+
+            if (isSun) {
+                // Any fixed direction; this won't be used anyway
+                dirEye = vec3(0.0f, 0.0f, -1.0f);
+            } else {
+                vec3 dirWorld = sunWorld - P.position;
+                vec4 dirEye4 = V * vec4(dirWorld, 0.0f);
+                dirEye = normalize(vec3(dirEye4.x, dirEye4.y, dirEye4.z));
+            }
+
         // transform to eye space (w=0 so no translation)
-        vec4 dirEye4 = V * vec4(dirWorld, 0.0f);
-        vec3 dirEye  = normalize(vec3(dirEye4.x, dirEye4.y, dirEye4.z));
 
         // upload that as your single directional light
         glUniform3fv(lightDirLoc, 1, &dirEye.x);
