@@ -19,8 +19,11 @@ static GLuint textures[3] = {0,0,0};               // sun / earth / moon
 
 static GLuint rayShader   = 0;                     // raytracer.glsl program
 static GLuint fsVAO       = 0;                     // full-screen triangle
-static float  lightSpeed  = 0.4f;                  // tweak with keys
-static float  gravityK    = 0.0f;
+static float  lightSpeed  = 5.1f;                  // tweak with keys
+static float  gravityK    = 0.01f;
+static float uHitEps=0.1;
+static float uDepthFar=50;
+
 GLuint shaderProgram=0;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,8 +43,8 @@ static void createFullScreenQuad()
 
 static GLuint compileRayProgram()
 {
-    return InitShader("shaders/screen.vert",        // passthrough VS (2D→gl_Position)
-                      "shaders/raytracer.glsl");    // the fragment shader you wrote
+    return InitShader("shaders/screen.vert", "shaders/raytracer.glsl");
+   // the fragment shader you wrote
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,6 +78,17 @@ static void uploadRayUniforms(int w,int h,const mat4& invView)
     glUniform3fv(glGetUniformLocation(rayShader,"uCamPos"),1,&cameraPos.x);
     glUniformMatrix4fv(glGetUniformLocation(rayShader,"uCamInvView"),1,GL_TRUE,invView);
 
+    
+    vec3 front = normalize(cameraFront);
+    vec3 right = normalize(cross(front, cameraUp));
+    vec3 up    = normalize(cameraUp);
+
+    glUniform3fv(glGetUniformLocation(rayShader,"uCamRight"),   1, &right.x);
+    glUniform3fv(glGetUniformLocation(rayShader,"uCamUp"),      1, &up.x);
+    glUniform3fv(glGetUniformLocation(rayShader,"uCamForward"), 1, &front.x);
+    glUniform1f (glGetUniformLocation(rayShader,"uAspect"), float(w)/h);
+    
+    
     glUniform1f(glGetUniformLocation(rayShader,"uFovRad"),
                 45.0f * Angel::DegreesToRadians);
     glUniform1f(glGetUniformLocation(rayShader,"uWorldLimit"), 200.0f);
@@ -82,6 +96,11 @@ static void uploadRayUniforms(int w,int h,const mat4& invView)
     glUniform1f(glGetUniformLocation(rayShader,"uGravityScale"), gravityK);
 
     glUniform1i(glGetUniformLocation(rayShader,"uSphereCount"), spheres.size());
+    
+    glUniform1f(glGetUniformLocation(rayShader,"uHitEps"),   0.02f);   // or tweak
+    glUniform1f(glGetUniformLocation(rayShader,"uDepthFar"), 300.0f);  // map s→depth
+    glUniform1f(glGetUniformLocation(rayShader, "uAspect"), float(w) / h);
+
 
     for(int i=0;i<spheres.size();++i){
         const auto& P = spheres[i]->getProperties();
@@ -97,6 +116,8 @@ static void uploadRayUniforms(int w,int h,const mat4& invView)
         base = "uSphereTex["  + std::to_string(i) + "]";
         glActiveTexture(GL_TEXTURE0+i);
         glBindTexture(GL_TEXTURE_2D, textures[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glUniform1i(glGetUniformLocation(rayShader, base.c_str()), i);
     }
 }
@@ -112,30 +133,16 @@ static void display(float dt)
     for(auto* s: spheres) s->integrate(dt, Gs);
 
     // ── camera matrices (for inverse-view) ────────────────────────────────
-    int w,h; glfwGetFramebufferSize(glfwGetCurrentContext(), &w,&h);
-    mat4 V = LookAt( vec4(cameraPos,1), vec4(cameraPos+cameraFront,1), vec4(cameraUp,0) );
-    mat4 invV; // The inverse we'll compute manually
+    int w, h;
+    glfwGetFramebufferSize(glfwGetCurrentContext(), &w, &h);
 
-    // Transpose of the upper-left 3x3 (rotation part)
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            invV[i][j] = V[j][i];
-
-    // Compute inverse translation = -Rᵀ * t
-    vec3 t(V[0][3], V[1][3], V[2][3]);
-    invV[0][3] = -(invV[0][0]*t.x + invV[0][1]*t.y + invV[0][2]*t.z);
-    invV[1][3] = -(invV[1][0]*t.x + invV[1][1]*t.y + invV[1][2]*t.z);
-    invV[2][3] = -(invV[2][0]*t.x + invV[2][1]*t.y + invV[2][2]*t.z);
-
-    // Set last row
-    invV[3][0] = 0.0;
-    invV[3][1] = 0.0;
-    invV[3][2] = 0.0;
-    invV[3][3] = 1.0;
+    mat4 V = LookAt(vec4(cameraPos,1),
+                    vec4(cameraPos + cameraFront,1),
+                    vec4(cameraUp, 0));
 
     // ── G-buffer clear & ray pass ─────────────────────────────────────────
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    uploadRayUniforms(w,h, invV);
+    uploadRayUniforms(w,h, V);
 
     glBindVertexArray(fsVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);

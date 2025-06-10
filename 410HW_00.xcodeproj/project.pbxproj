@@ -40,6 +40,7 @@
 		BC645C362DF789380047B4C1 /* globals.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = globals.h; sourceTree = "<group>"; };
 		BC645C472DF7CF900047B4C1 /* raytracer.glsl */ = {isa = PBXFileReference; lastKnownFileType = text; path = raytracer.glsl; sourceTree = "<group>"; };
 		BC645C482DF7D1190047B4C1 /* screen.vert */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.glsl; path = screen.vert; sourceTree = "<group>"; };
+		BC645C4B2DF7E6E00047B4C1 /* diag.glsl */ = {isa = PBXFileReference; lastKnownFileType = text; path = diag.glsl; sourceTree = "<group>"; };
 		BC812F502DEE5D0E00130274 /* ppm_loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ppm_loader.h; sourceTree = "<group>"; };
 		BC812F512DEE669E00130274 /* basketball.ppm */ = {isa = PBXFileReference; lastKnownFileType = text; path = basketball.ppm; sourceTree = "<group>"; };
 		BC812F522DEE66A500130274 /* earth.ppm */ = {isa = PBXFileReference; lastKnownFileType = text; path = earth.ppm; sourceTree = "<group>"; };
@@ -156,6 +157,7 @@
 		BCE7EE972D881E4700BE1451 /* shaders */ = {
 			isa = PBXGroup;
 			children = (
+				BC645C4B2DF7E6E00047B4C1 /* diag.glsl */,
 				BC645C482DF7D1190047B4C1 /* screen.vert */,
 				BC645C472DF7CF900047B4C1 /* raytracer.glsl */,
 				BCE7EE952D881E4700BE1451 /* fragment.glsl */,

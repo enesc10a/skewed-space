@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 
 // camera globals
-vec3 cameraPos   = vec3(0.0f, 0.0f,  100.0f);
+vec3 cameraPos   = vec3(0.0f, 0.0f,  -150.0f);
 vec3 cameraFront = vec3(0.0f, 0.0f, -1.0f);
 vec3 cameraUp    = vec3(0.0f, 1.0f,  0.0f);
 float cameraSpeed = 20.0f; // units per second
