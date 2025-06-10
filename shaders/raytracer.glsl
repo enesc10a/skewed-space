@@ -2,10 +2,10 @@
 #version 410 core
 precision highp float;
 
-const int MAX_SPHERES = 8;
-const int MAX_STEPS  = 20;
-const float STEP_FACTOR = 1.15;
-const float MAX_DT     = 1.0;
+const int   MAX_SPHERES = 8;
+const int   MAX_STEPS   = 30;
+const float STEP_FACTOR = 0.15;
+const float MAX_DT      = 1.0;
 
 uniform vec2  uResolution;
 uniform vec3  uCamPos, uCamRight, uCamUp, uCamForward;

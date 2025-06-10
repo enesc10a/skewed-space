@@ -22,7 +22,7 @@ static GLuint textures[8] = {0}, texSun = 0, texEarth = 0, texMoon = 0;
 static GLuint rayShader = 0, fsVAO = 0;
 
 // Simulation params
-static float lightSpeed = 10.1f;
+static float lightSpeed = 18.1f;
 static float gravityK   = 0.05f;
 
 // World selector
