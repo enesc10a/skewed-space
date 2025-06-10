@@ -35,7 +35,6 @@
 		BC21604E2D779EF400D81D25 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
 		BC2160502D779F2A00D81D25 /* libglfw.3.4.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libglfw.3.4.dylib; path = ../../../../../../opt/homebrew/Cellar/glfw/3.4/lib/libglfw.3.4.dylib; sourceTree = "<group>"; };
 		BC361C552DF4F24E0065ED8F /* ppm_loader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ppm_loader.cpp; sourceTree = "<group>"; };
-		BC361C572DF4F3080065ED8F /* sun.ppm */ = {isa = PBXFileReference; lastKnownFileType = file; path = sun.ppm; sourceTree = "<group>"; };
 		BC361C592DF4F4540065ED8F /* moon.ppm */ = {isa = PBXFileReference; lastKnownFileType = text; path = moon.ppm; sourceTree = "<group>"; };
 		BC645C362DF789380047B4C1 /* globals.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = globals.h; sourceTree = "<group>"; };
 		BC645C472DF7CF900047B4C1 /* raytracer.glsl */ = {isa = PBXFileReference; lastKnownFileType = text; path = raytracer.glsl; sourceTree = "<group>"; };
@@ -44,6 +43,8 @@
 		BC812F502DEE5D0E00130274 /* ppm_loader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ppm_loader.h; sourceTree = "<group>"; };
 		BC812F512DEE669E00130274 /* basketball.ppm */ = {isa = PBXFileReference; lastKnownFileType = text; path = basketball.ppm; sourceTree = "<group>"; };
 		BC812F522DEE66A500130274 /* earth.ppm */ = {isa = PBXFileReference; lastKnownFileType = text; path = earth.ppm; sourceTree = "<group>"; };
+		BC988DCD2DF8EAF0001D87F7 /* sun.ppm */ = {isa = PBXFileReference; lastKnownFileType = text; path = sun.ppm; sourceTree = "<group>"; };
+		BC988DCE2DF8EB42001D87F7 /* neutron_star.ppm */ = {isa = PBXFileReference; lastKnownFileType = text; path = neutron_star.ppm; sourceTree = "<group>"; };
 		BCE7EE7E2D881DBC00BE1451 /* bunny.off */ = {isa = PBXFileReference; lastKnownFileType = text; path = bunny.off; sourceTree = "<group>"; };
 		BCE7EE802D881DF200BE1451 /* InitShader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InitShader.h; sourceTree = "<group>"; };
 		BCE7EE812D881DF200BE1451 /* InitShader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InitShader.cpp; sourceTree = "<group>"; };
@@ -111,10 +112,11 @@
 		BCE7EE7F2D881DBC00BE1451 /* resources */ = {
 			isa = PBXGroup;
 			children = (
+				BC988DCE2DF8EB42001D87F7 /* neutron_star.ppm */,
+				BC988DCD2DF8EAF0001D87F7 /* sun.ppm */,
 				BCE7EE7E2D881DBC00BE1451 /* bunny.off */,
 				BC812F512DEE669E00130274 /* basketball.ppm */,
 				BC812F522DEE66A500130274 /* earth.ppm */,
-				BC361C572DF4F3080065ED8F /* sun.ppm */,
 				BC361C592DF4F4540065ED8F /* moon.ppm */,
 			);
 			path = resources;
