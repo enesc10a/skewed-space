@@ -19,8 +19,8 @@ static GLuint textures[3] = {0,0,0};               // sun / earth / moon
 
 static GLuint rayShader   = 0;                     // raytracer.glsl program
 static GLuint fsVAO       = 0;                     // full-screen triangle
-static float  lightSpeed  = 5.1f;                  // tweak with keys
-static float  gravityK    = 0.01f;
+static float  lightSpeed  = 10.1f;                  // tweak with keys
+static float  gravityK    = 0.005f;
 static float uHitEps=0.1;
 static float uDepthFar=50;
 
@@ -100,7 +100,10 @@ static void uploadRayUniforms(int w,int h,const mat4& invView)
     glUniform1f(glGetUniformLocation(rayShader,"uHitEps"),   0.02f);   // or tweak
     glUniform1f(glGetUniformLocation(rayShader,"uDepthFar"), 300.0f);  // map s→depth
     glUniform1f(glGetUniformLocation(rayShader, "uAspect"), float(w) / h);
-
+    glUniform1i (glGetUniformLocation(rayShader,"uSunIndex"), 0);
+    glUniform3f(glGetUniformLocation(rayShader,"uKd"), 0.8f, 0.8f, 0.8f);
+    glUniform3f(glGetUniformLocation(rayShader,"uKs"), 1.0f, 1.0f, 1.0f);
+    glUniform1f(glGetUniformLocation(rayShader,"uShininess"), 32.0f);
 
     for(int i=0;i<spheres.size();++i){
         const auto& P = spheres[i]->getProperties();
