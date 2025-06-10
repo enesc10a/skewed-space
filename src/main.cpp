@@ -1,187 +1,176 @@
+//=============================================================================
+//  main.cpp  —  Free-Roam Spheres (GPU Ray-traced Version)
+//=============================================================================
 #include "Angel.h"
 #include "sphere.h"
 #include "callbacks.h"
 #include "ppm_loader.h"
 #include <vector>
 #include "globals.h"
-// camera globals
-extern vec3 cameraPos, cameraFront, cameraUp;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  GLOBALS
+// ─────────────────────────────────────────────────────────────────────────────
+extern vec3  cameraPos, cameraFront, cameraUp;     // provided by callbacks
 extern float cameraSpeed;
 
-// scene globals
-static std::vector<Sphere*> spheres;
-static GLuint textures[3]  = {0,0,0};
-GLuint shaderProgram = 0;
+static std::vector<Sphere*> spheres;               // physics objects
+static GLuint textures[3] = {0,0,0};               // sun / earth / moon
 
-// set up common uniforms (your existing code)
-static void setCommonUniforms(const mat4& V, const mat4& P) {
-    glUseProgram(shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"),       1, GL_TRUE, V);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_TRUE, P);
-    glUniform1i  (glGetUniformLocation(shaderProgram, "uShadingMode"),    1);
-    glUniform1i  (glGetUniformLocation(shaderProgram, "uTexturing"),      1);
-    glUniform3f  (glGetUniformLocation(shaderProgram, "uKa"),   0.1f,0.1f,0.1f);
-    glUniform3f  (glGetUniformLocation(shaderProgram, "uKd"),   0.8f,0.8f,0.8f);
-    glUniform3f  (glGetUniformLocation(shaderProgram, "uKs"),   1.0f,1.0f,1.0f);
-    glUniform1f  (glGetUniformLocation(shaderProgram, "uShininess"), 32.0f);
-    glUniform1i  (glGetUniformLocation(shaderProgram, "uUseAmb"),  1);
-    glUniform1i  (glGetUniformLocation(shaderProgram, "uUseDiff"), 1);
-    glUniform1i  (glGetUniformLocation(shaderProgram, "uUseSpec"), 1);
-    
+static GLuint rayShader   = 0;                     // raytracer.glsl program
+static GLuint fsVAO       = 0;                     // full-screen triangle
+static float  lightSpeed  = 0.4f;                  // tweak with keys
+static float  gravityK    = 0.0f;
+GLuint shaderProgram=0;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  HELPERS — build full-screen triangle & simple VS
+// ─────────────────────────────────────────────────────────────────────────────
+static void createFullScreenQuad()
+{
+    float tri[6] = { -1,-1,  3,-1,  -1, 3 };
+    glGenVertexArrays(1,&fsVAO);
+    glBindVertexArray(fsVAO);
+    GLuint vbo;  glGenBuffers(1,&vbo);
+    glBindBuffer(GL_ARRAY_BUFFER,vbo);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(tri),tri,GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
 }
 
-static void initScene() {
-    shaderProgram = InitShader("shaders/vertex.glsl", "shaders/fragment.glsl");
-    glUseProgram(shaderProgram);
-    
+static GLuint compileRayProgram()
+{
+    return InitShader("shaders/screen.vert",        // passthrough VS (2D→gl_Position)
+                      "shaders/raytracer.glsl");    // the fragment shader you wrote
+}
 
-    // load textures
+// ─────────────────────────────────────────────────────────────────────────────
+//  INITIALISATION
+// ─────────────────────────────────────────────────────────────────────────────
+static void initScene()
+{
+    rayShader = compileRayProgram();
+    createFullScreenQuad();
+
     textures[0] = loadPPMTexture("resources/sun.ppm");
     textures[1] = loadPPMTexture("resources/earth.ppm");
     textures[2] = loadPPMTexture("resources/moon.ppm");
 
     spheres.reserve(3);
 
-    // Sun: heavy, almost stationary at origin
-    Sphere::Properties sunProps{
-        2.0f,                   // radius
-        vec3(0.0f, 0.0f, 0.0f), // position
-        vec3(0.0f),             // velocity
-        vec3(0.0f, 1.0f, 0.0f), // rotation axis
-        5.0f,                   // rotation speed (deg/sec)
-        10000.0f                // mass
-    };
-
-    // Earth: orbits Sun roughly in a circle
-    Sphere::Properties earthProps{
-        1.0f,                   // radius
-        vec3(20.0f, 0.0f, 0.0f),// position 20 units on +X
-        vec3(0.0f, 0.0f, 15.0f),// initial tangential velocity
-        vec3(0.0f, 1.0f, 0.0f), // rotation axis
-        30.0f,                  // rotation speed
-        1.0f                    // mass
-    };
-
-    // Moon: small, orbits Earth
-    Sphere::Properties moonProps{
-        0.5f,                   // radius
-        vec3(25.0f, 0.0f, 0.0f),// 5 units beyond Earth
-        vec3(0.0f, 0.0f, 18.0f),// slightly faster tangential velocity
-        vec3(0.0f, 1.0f, 0.0f), // rotation axis
-        60.0f,                  // rotation speed
-        0.01f                    // mass
-    };
-
-    // instantiate and pass neighbor list for force calculations
-    spheres.push_back(new Sphere(20, sunProps,   &spheres));
-    spheres.push_back(new Sphere(20, earthProps, &spheres));
-    spheres.push_back(new Sphere(20, moonProps,  &spheres));
+    spheres.push_back(new Sphere(20,{ 2.0f, { 0,0,0 }, {0}, {0,1,0}, 5.0f, 10000.0f }, &spheres));
+    spheres.push_back(new Sphere(20,{ 1.0f, {20,0,0}, {0,0,15}, {0,1,0}, 30.0f, 1.0f }, &spheres));
+    spheres.push_back(new Sphere(20,{ 0.5f, {25,0,0}, {0,0,18}, {0,1,0}, 60.0f, 0.01f}, &spheres));
 
     glEnable(GL_DEPTH_TEST);
 }
 
-static void display(float deltaTime) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+// ─────────────────────────────────────────────────────────────────────────────
+//  PER-FRAME UNIFORM UPLOAD  (for the ray shader)
+// ─────────────────────────────────────────────────────────────────────────────
+static void uploadRayUniforms(int w,int h,const mat4& invView)
+{
+    glUseProgram(rayShader);
+    glUniform2f (glGetUniformLocation(rayShader,"uResolution"), w, h);
+    glUniform3fv(glGetUniformLocation(rayShader,"uCamPos"),1,&cameraPos.x);
+    glUniformMatrix4fv(glGetUniformLocation(rayShader,"uCamInvView"),1,GL_TRUE,invView);
 
-    // 1. Physics update (unchanged)
-    const float Gscale = 1.0f;
-    for (auto* s : spheres) s->computeNetForce();
-    for (auto* s : spheres) s->integrate(deltaTime, Gscale);
+    glUniform1f(glGetUniformLocation(rayShader,"uFovRad"),
+                45.0f * Angel::DegreesToRadians);
+    glUniform1f(glGetUniformLocation(rayShader,"uWorldLimit"), 200.0f);
+    glUniform1f(glGetUniformLocation(rayShader,"uLightSpeed"), lightSpeed);
+    glUniform1f(glGetUniformLocation(rayShader,"uGravityScale"), gravityK);
 
-    // 2. Build camera matrices
-    vec4 eye4 = vec4(cameraPos, 1.0f);
-    vec4 at4  = vec4(cameraPos + cameraFront, 1.0f);
-    vec4 up4  = vec4(cameraUp, 0.0f);
-    mat4 V    = LookAt(eye4, at4, up4);
+    glUniform1i(glGetUniformLocation(rayShader,"uSphereCount"), spheres.size());
 
-    int w, h;
-    glfwGetFramebufferSize(glfwGetCurrentContext(), &w, &h);
-    mat4 P    = Perspective(45.0f, float(w)/float(h), 0.1f, 100.0f);
+    for(int i=0;i<spheres.size();++i){
+        const auto& P = spheres[i]->getProperties();
+        std::string base = "uSpherePos["  + std::to_string(i) + "]";
+        glUniform3fv(glGetUniformLocation(rayShader, base.c_str()),1,&P.position.x);
 
-    setCommonUniforms(V, P);
+        base = "uSphereRad["  + std::to_string(i) + "]";
+        glUniform1f(glGetUniformLocation(rayShader, base.c_str()), P.radius);
 
-    // 3. Compute Sun→eye‐space once
-    //    (we’ll reuse to compute per-object directional)
-    vec3 sunWorld = spheres[0]->getProperties().position;
-    vec4 sunEye4  = V * vec4(sunWorld, 1.0f);
-    vec3 sunEye   = vec3(sunEye4.x, sunEye4.y, sunEye4.z);
-    
-    // locate the uniform once
-    GLint lightDirLoc = glGetUniformLocation(shaderProgram, "uLightDir");
-    GLint modelLoc    = glGetUniformLocation(shaderProgram, "model");
-    
-    
-    GLint isSunLoc = glGetUniformLocation(shaderProgram, "uIsSun");
-    GLint locSunBright = glGetUniformLocation(shaderProgram, "uSunBright");
-    GLint locSunYellow = glGetUniformLocation(shaderProgram, "uSunYellow");
-    float sunBrightVal = 90.5f;
-    float sunYellowVal = 0.4f;
-    
-    
-    // 4. Draw each sphere with its own uLightDir
-    for (size_t i = 0; i < spheres.size(); ++i) {
-        bool isSun = (i == 0);                            // sun is spheres[0]
-            glUniform1i(isSunLoc, isSun ? 1 : 0);
-            glUniform1f(locSunBright, sunBrightVal);
-            glUniform1f(locSunYellow, sunYellowVal);
-        auto& P = spheres[i]->getProperties();
-        vec3 dirEye;
+        base = "uSphereMass[" + std::to_string(i) + "]";
+        glUniform1f(glGetUniformLocation(rayShader, base.c_str()), P.mass);
 
-            if (isSun) {
-                // Any fixed direction; this won't be used anyway
-                dirEye = vec3(0.0f, 0.0f, -1.0f);
-            } else {
-                vec3 dirWorld = sunWorld - P.position;
-                vec4 dirEye4 = V * vec4(dirWorld, 0.0f);
-                dirEye = normalize(vec3(dirEye4.x, dirEye4.y, dirEye4.z));
-            }
-
-        // transform to eye space (w=0 so no translation)
-
-        // upload that as your single directional light
-        glUniform3fv(lightDirLoc, 1, &dirEye.x);
-
-        // model matrix
-        mat4 M = Translate(P.position) * Scale(P.radius, P.radius, P.radius);
-        glUniformMatrix4fv(modelLoc, 1, GL_TRUE, M);
-
-        // bind texture + draw
-        glActiveTexture(GL_TEXTURE0);
+        base = "uSphereTex["  + std::to_string(i) + "]";
+        glActiveTexture(GL_TEXTURE0+i);
         glBindTexture(GL_TEXTURE_2D, textures[i]);
-        spheres[i]->draw();
+        glUniform1i(glGetUniformLocation(rayShader, base.c_str()), i);
     }
 }
 
-int main() {
-    if (!glfwInit()) return EXIT_FAILURE;
+// ─────────────────────────────────────────────────────────────────────────────
+//  DISPLAY
+// ─────────────────────────────────────────────────────────────────────────────
+static void display(float dt)
+{
+    // ── physics (unchanged) ────────────────────────────────────────────────
+    const float Gs = 1.0f;
+    for(auto* s: spheres) s->computeNetForce();
+    for(auto* s: spheres) s->integrate(dt, Gs);
 
+    // ── camera matrices (for inverse-view) ────────────────────────────────
+    int w,h; glfwGetFramebufferSize(glfwGetCurrentContext(), &w,&h);
+    mat4 V = LookAt( vec4(cameraPos,1), vec4(cameraPos+cameraFront,1), vec4(cameraUp,0) );
+    mat4 invV; // The inverse we'll compute manually
+
+    // Transpose of the upper-left 3x3 (rotation part)
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            invV[i][j] = V[j][i];
+
+    // Compute inverse translation = -Rᵀ * t
+    vec3 t(V[0][3], V[1][3], V[2][3]);
+    invV[0][3] = -(invV[0][0]*t.x + invV[0][1]*t.y + invV[0][2]*t.z);
+    invV[1][3] = -(invV[1][0]*t.x + invV[1][1]*t.y + invV[1][2]*t.z);
+    invV[2][3] = -(invV[2][0]*t.x + invV[2][1]*t.y + invV[2][2]*t.z);
+
+    // Set last row
+    invV[3][0] = 0.0;
+    invV[3][1] = 0.0;
+    invV[3][2] = 0.0;
+    invV[3][3] = 1.0;
+
+    // ── G-buffer clear & ray pass ─────────────────────────────────────────
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    uploadRayUniforms(w,h, invV);
+
+    glBindVertexArray(fsVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MAIN
+// ─────────────────────────────────────────────────────────────────────────────
+int main()
+{
+    if(!glfwInit()) return EXIT_FAILURE;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
     glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
 
-    // create & store the window pointer
-    GLFWwindow* win = glfwCreateWindow(800, 600, "Free Roam Spheres", nullptr, nullptr);
-    if (!win) { glfwTerminate(); return EXIT_FAILURE; }
+    GLFWwindow* win = glfwCreateWindow(800,600,"Free-Roam Spheres",nullptr,nullptr);
+    if(!win){ glfwTerminate(); return EXIT_FAILURE; }
     glfwMakeContextCurrent(win);
 
-    // input callbacks
     glfwSetKeyCallback(win, keyCallback);
     glfwSetFramebufferSizeCallback(win, framebufferSizeCallback);
 
     initScene();
 
-    double lastTime = glfwGetTime();
-    while (!glfwWindowShouldClose(win)) {
-        double now  = glfwGetTime();
-        float  dt   = float(now - lastTime);
-        lastTime    = now;
-        dt=dt*0.8;
+    double last = glfwGetTime();
+    while(!glfwWindowShouldClose(win)){
+        double now = glfwGetTime();
+        float  dt  = float(now-last)*0.8f;  last = now;
+
         display(dt);
+
         glfwSwapBuffers(win);
         glfwPollEvents();
     }
-
-    for (auto* s : spheres) delete s;
+    for(auto* s: spheres) delete s;
     glfwDestroyWindow(win);
     glfwTerminate();
     return EXIT_SUCCESS;

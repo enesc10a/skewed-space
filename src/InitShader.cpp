@@ -66,5 +66,50 @@ GLuint InitShader(const char* vertexShaderFile, const char* fragmentShaderFile) 
 
     return shaderProgram; // Return the compiled and linked shader program
 }
+GLuint InitShader2(const char* vertexShaderFile,
+                   const char* fragmentShaderFile)
+{
+    auto readFile = [](const char* path)->std::string {
+        std::ifstream f(path, std::ios::in | std::ios::binary);
+        if(!f) { std::cerr << "Cannot open shader: " << path << '\n'; exit(EXIT_FAILURE); }
+        std::ostringstream ss; ss << f.rdbuf(); return ss.str();
+    };
 
+    const std::string vsrcStr = readFile(vertexShaderFile);
+    const std::string fsrcStr = readFile(fragmentShaderFile);
+    const char* vsrc = vsrcStr.c_str();
+    const char* fsrc = fsrcStr.c_str();
+
+    auto compile = [](GLenum type, const char* src, const char* name)->GLuint {
+        GLuint id = glCreateShader(type);
+        glShaderSource(id,1,&src,nullptr);
+        glCompileShader(id);
+        GLint ok; glGetShaderiv(id,GL_COMPILE_STATUS,&ok);
+        if(!ok){
+            GLint len; glGetShaderiv(id,GL_INFO_LOG_LENGTH,&len);
+            std::vector<char> log(len);
+            glGetShaderInfoLog(id,len,nullptr,log.data());
+            std::cerr << "Error compiling "<< name <<":\n"<< log.data() <<'\n';
+            exit(EXIT_FAILURE);
+        }
+        return id;
+    };
+
+    GLuint vs = compile(GL_VERTEX_SHADER  , vsrc, vertexShaderFile);
+    GLuint fs = compile(GL_FRAGMENT_SHADER, fsrc, fragmentShaderFile);
+
+    GLuint prog = glCreateProgram();
+    glAttachShader(prog,vs); glAttachShader(prog,fs);
+    glLinkProgram(prog);
+
+    GLint linked; glGetProgramiv(prog,GL_LINK_STATUS,&linked);
+    if(!linked){
+        GLint len; glGetProgramiv(prog,GL_INFO_LOG_LENGTH,&len);
+        std::vector<char> log(len);
+        glGetProgramInfoLog(prog,len,nullptr,log.data());
+        std::cerr << "Link error:\n"<< log.data() <<'\n';
+        exit(EXIT_FAILURE);
+    }
+    return prog;
+}
 }
