@@ -8,14 +8,14 @@
 #include <string>
 
 // Camera globals
-static Angel::vec3 cameraPosOrig(0.0f, 5.0f, -50.0f);
+static Angel::vec3 cameraPosOrig(0.0f, 5.0f, -30.0f);
 static Angel::vec3 cameraFrontOrig(0.0f, 0.0f, -1.0f);
 static Angel::vec3 cameraUpOrig(0.0f, 1.0f, 0.0f);
 
 Angel::vec3 cameraPos   = cameraPosOrig;
 Angel::vec3 cameraFront = cameraFrontOrig;
 Angel::vec3 cameraUp    = cameraUpOrig;
-float cameraSpeed = 30.0f;
+float cameraSpeed = 80.0f;
 
 static std::vector<Sphere*> spheres;
 static GLuint textures[8] = {0}, texSun = 0, texEarth = 0, texMoon = 0;
@@ -62,11 +62,33 @@ static void loadWorld(int w) {
             spheres.push_back(new Sphere(20,{0.5f,{25,0,0},{0,0,18},{0,1,0},60.0f,0.01f},&spheres));
             break;
         case 1: {
-            const float a=10.0f,M=8000.0f,vs=14.1421f;
-            spheres.push_back(new Sphere(20,{2.5f,{-a,0,0},{0,0,vs},{0,1,0},5.0f,M},&spheres));
-            spheres.push_back(new Sphere(20,{2.5f,{ a,0,0},{0,0,-vs},{0,1,0},5.0f,M},&spheres));
-            const float Re=30.0f, ve=23.0940f;
-            spheres.push_back(new Sphere(20,{1.0f,{0,Re,0},{ve,0,0},{0,1,0},30.0f,1.0f},&spheres));
+            // two suns in a tighter binary, Earth in a stable circumbinary orbit
+            const float a     = 5.0f;                             // half‐separation
+            const float M     = 8000.0f;                          // each sun’s mass
+            const float vs    = sqrt(M / (4.0f * a));             // binary orbital speed ≈20
+            const float vdiag = vs / sqrt(2.0f);                  // components for diagonal motion
+
+            // Sun A at (−a,−a,0), velocity perpendicular in XY plane
+            spheres.push_back(new Sphere(
+                20,
+                { 2.5f, { -a, -a, 0 }, {  vdiag, 0.0f, -vdiag }, { 0,1,0 }, 5.0f, M },
+                &spheres
+            ));
+            // Sun B at (+a,+a,0), opposite velocity
+            spheres.push_back(new Sphere(
+                20,
+                { 2.5f, {  a,  a, 0 }, { -vdiag, 0.0f,  vdiag }, { 0,1,0 }, 5.0f, M },
+                &spheres
+            ));
+
+            // Earth in a circumbinary orbit at ~4× the binary half‐separation
+            const float Re = 4.0f * a;                           // =20
+            const float ve = sqrt(2.0f * M / Re);                // ≈28.3
+            spheres.push_back(new Sphere(
+                20,
+                { 1.0f, { Re, 0.0f, 0.0f }, { 0.0f, 0.0f, ve }, { 0,1,0 }, 30.0f, 1.0f },
+                &spheres
+            ));
         } break;
         case 2:
             spheres.push_back(new Sphere(20,{3.0f,{0,0,0},{0},{0,1,0},5.0f,10000.0f},&spheres));
