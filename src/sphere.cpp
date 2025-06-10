@@ -128,9 +128,6 @@ void Sphere::draw() const {
     Angel::mat4 M = T * R * S;
 
     // upload to uniform
-    GLint loc = glGetUniformLocation(shaderProgram, "model");
-    glUniformMatrix4fv(loc, 1, GL_TRUE, M);
-
     // draw
     glBindVertexArray(vao_);
     glDrawArrays(GL_TRIANGLES, 0, numVertices_);

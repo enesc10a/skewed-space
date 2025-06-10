@@ -40,7 +40,7 @@ private:
     Properties                  props_;
     const std::vector<Sphere*>* neighbors_    = nullptr;
     vec3                        netForce_     = vec3(0.0f);
-    float                       orientation_  = 0.0f;
+    float                       orientation_  = 5.0f;
 };
 
 #endif // SPHERE_H

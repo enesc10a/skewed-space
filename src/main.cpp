@@ -1,186 +1,225 @@
-//=============================================================================
-//  main.cpp  —  Free-Roam Spheres (GPU Ray-traced Version)
-//=============================================================================
+// main.cpp  —  Free-Roam Spheres (GPU Ray-traced Version) – Multi-World, Reset & Self‐Rotation
 #include "Angel.h"
 #include "sphere.h"
 #include "callbacks.h"
 #include "ppm_loader.h"
 #include <vector>
-#include "globals.h"
+#include <GLFW/glfw3.h>
+#include <string>
+
+// Camera globals
+static Angel::vec3 cameraPosOrig(0.0f, 5.0f, -50.0f);
+static Angel::vec3 cameraFrontOrig(0.0f, 0.0f, -1.0f);
+static Angel::vec3 cameraUpOrig(0.0f, 1.0f, 0.0f);
+
+Angel::vec3 cameraPos   = cameraPosOrig;
+Angel::vec3 cameraFront = cameraFrontOrig;
+Angel::vec3 cameraUp    = cameraUpOrig;
+float cameraSpeed = 30.0f;
+
+static std::vector<Sphere*> spheres;
+static GLuint textures[8] = {0}, texSun = 0, texEarth = 0, texMoon = 0;
+static GLuint rayShader = 0, fsVAO = 0;
+
+// Simulation params
+static float lightSpeed = 10.1f;
+static float gravityK   = 0.05f;
+
+// World selector
+static int currentWorld = 0;
+static const int WORLD_COUNT = 4;
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  GLOBALS
-// ─────────────────────────────────────────────────────────────────────────────
-extern vec3  cameraPos, cameraFront, cameraUp;     // provided by callbacks
-extern float cameraSpeed;
-
-static std::vector<Sphere*> spheres;               // physics objects
-static GLuint textures[3] = {0,0,0};               // sun / earth / moon
-
-static GLuint rayShader   = 0;                     // raytracer.glsl program
-static GLuint fsVAO       = 0;                     // full-screen triangle
-static float  lightSpeed  = 10.1f;                  // tweak with keys
-static float  gravityK    = 0.005f;
-static float uHitEps=0.1;
-static float uDepthFar=50;
-
-GLuint shaderProgram=0;
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  HELPERS — build full-screen triangle & simple VS
-// ─────────────────────────────────────────────────────────────────────────────
-static void createFullScreenQuad()
-{
-    float tri[6] = { -1,-1,  3,-1,  -1, 3 };
-    glGenVertexArrays(1,&fsVAO);
+static void createFullScreenQuad() {
+    float tri[6] = { -1,-1, 3,-1, -1,3 };
+    glGenVertexArrays(1, &fsVAO);
     glBindVertexArray(fsVAO);
-    GLuint vbo;  glGenBuffers(1,&vbo);
-    glBindBuffer(GL_ARRAY_BUFFER,vbo);
-    glBufferData(GL_ARRAY_BUFFER,sizeof(tri),tri,GL_STATIC_DRAW);
+    GLuint vbo; glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(tri), tri, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,(void*)0);
 }
 
-static GLuint compileRayProgram()
-{
+static GLuint compileRayProgram() {
     return InitShader("shaders/screen.vert", "shaders/raytracer.glsl");
-   // the fragment shader you wrote
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  INITIALISATION
-// ─────────────────────────────────────────────────────────────────────────────
-static void initScene()
-{
+static void loadWorld(int w) {
+    spheres.clear();
+    // textures
+    switch(w) {
+        case 0: textures[0]=texSun; textures[1]=texEarth; textures[2]=texMoon; break;
+        case 1: textures[0]=texSun; textures[1]=texSun;   textures[2]=texEarth; break;
+        case 2: textures[0]=texSun; for(int i=1;i<=4;++i) textures[i]=texEarth; break;
+        case 3: textures[0]=texSun; textures[1]=texSun; textures[2]=texSun; break;
+    }
+    // spheres
+    switch(w) {
+        case 0:
+            spheres.push_back(new Sphere(20,{2.0f,{0,0,0},{0},{0,1,0},5.0f,10000.0f},&spheres));
+            spheres.push_back(new Sphere(20,{1.0f,{20,0,0},{0,0,15},{0,1,0},30.0f,1.0f},&spheres));
+            spheres.push_back(new Sphere(20,{0.5f,{25,0,0},{0,0,18},{0,1,0},60.0f,0.01f},&spheres));
+            break;
+        case 1: {
+            const float a=10.0f,M=8000.0f,vs=14.1421f;
+            spheres.push_back(new Sphere(20,{2.5f,{-a,0,0},{0,0,vs},{0,1,0},5.0f,M},&spheres));
+            spheres.push_back(new Sphere(20,{2.5f,{ a,0,0},{0,0,-vs},{0,1,0},5.0f,M},&spheres));
+            const float Re=30.0f, ve=23.0940f;
+            spheres.push_back(new Sphere(20,{1.0f,{0,Re,0},{ve,0,0},{0,1,0},30.0f,1.0f},&spheres));
+        } break;
+        case 2:
+            spheres.push_back(new Sphere(20,{3.0f,{0,0,0},{0},{0,1,0},5.0f,10000.0f},&spheres));
+            { const float R=20.0f,v=12.0f; float ang[4]={0,1.5708f,3.1416f,4.7124f};
+              for(int i=0;i<4;++i){
+                float x=R*cos(ang[i]), z=R*sin(ang[i]);
+                spheres.push_back(new Sphere(20,{1.0f,{x,0,z},{ v*z/R,0,-v*x/R},{0,1,0},30.0f,1.0f},&spheres));
+              }
+            } break;
+        case 3: {
+            const float R=15.0f,v=22.0f;
+            float posX[3]={R,-R*0.5f,-R*0.5f}, posZ[3]={0,R*0.866f,-R*0.866f};
+            for(int i=0;i<3;++i){
+                Angel::vec3 p={posX[i],0,posZ[i]};
+                Angel::vec3 tang=normalize(cross({0,1,0},p));
+                Angel::vec3 vel=tang*v;
+                spheres.push_back(new Sphere(20,{2.5f,p,{vel.x,vel.y,vel.z},{0,1,0},5.0f,9000.0f},&spheres));
+            }
+        } break;
+    }
+}
+
+static void initScene() {
     rayShader = compileRayProgram();
     createFullScreenQuad();
-
-    textures[0] = loadPPMTexture("resources/sun.ppm");
-    textures[1] = loadPPMTexture("resources/earth.ppm");
-    textures[2] = loadPPMTexture("resources/moon.ppm");
-
-    spheres.reserve(3);
-
-    spheres.push_back(new Sphere(20,{ 2.0f, { 0,0,0 }, {0}, {0,1,0}, 5.0f, 10000.0f }, &spheres));
-    spheres.push_back(new Sphere(20,{ 1.0f, {20,0,0}, {0,0,15}, {0,1,0}, 30.0f, 1.0f }, &spheres));
-    spheres.push_back(new Sphere(20,{ 0.5f, {25,0,0}, {0,0,18}, {0,1,0}, 60.0f, 0.01f}, &spheres));
-
+    texSun   = loadPPMTexture("resources/sun.ppm");
+    texEarth = loadPPMTexture("resources/earth.ppm");
+    texMoon  = loadPPMTexture("resources/moon.ppm");
     glEnable(GL_DEPTH_TEST);
+    loadWorld(currentWorld);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  PER-FRAME UNIFORM UPLOAD  (for the ray shader)
-// ─────────────────────────────────────────────────────────────────────────────
-static void uploadRayUniforms(int w,int h,const mat4& invView)
-{
+static void uploadRayUniforms(int w,int h,const Angel::mat4& invView){
     glUseProgram(rayShader);
-    glUniform2f (glGetUniformLocation(rayShader,"uResolution"), w, h);
+
+    // time‐based orientation
+    float t = static_cast<float>(glfwGetTime());
+    glUniform1f(glGetUniformLocation(rayShader,"uTime"), t);
+
+    glUniform2f(glGetUniformLocation(rayShader,"uResolution"),w,h);
     glUniform3fv(glGetUniformLocation(rayShader,"uCamPos"),1,&cameraPos.x);
     glUniformMatrix4fv(glGetUniformLocation(rayShader,"uCamInvView"),1,GL_TRUE,invView);
 
-    
-    vec3 front = normalize(cameraFront);
-    vec3 right = normalize(cross(front, cameraUp));
-    vec3 up    = normalize(cameraUp);
+    Angel::vec3 f=normalize(cameraFront), r=normalize(cross(f,cameraUp)), u=normalize(cameraUp);
+    glUniform3fv(glGetUniformLocation(rayShader,"uCamRight"),1,&r.x);
+    glUniform3fv(glGetUniformLocation(rayShader,"uCamUp"),1,&u.x);
+    glUniform3fv(glGetUniformLocation(rayShader,"uCamForward"),1,&f.x);
 
-    glUniform3fv(glGetUniformLocation(rayShader,"uCamRight"),   1, &right.x);
-    glUniform3fv(glGetUniformLocation(rayShader,"uCamUp"),      1, &up.x);
-    glUniform3fv(glGetUniformLocation(rayShader,"uCamForward"), 1, &front.x);
-    glUniform1f (glGetUniformLocation(rayShader,"uAspect"), float(w)/h);
-    
-    
-    glUniform1f(glGetUniformLocation(rayShader,"uFovRad"),
-                45.0f * Angel::DegreesToRadians);
-    glUniform1f(glGetUniformLocation(rayShader,"uWorldLimit"), 200.0f);
-    glUniform1f(glGetUniformLocation(rayShader,"uLightSpeed"), lightSpeed);
-    glUniform1f(glGetUniformLocation(rayShader,"uGravityScale"), gravityK);
+    glUniform1f(glGetUniformLocation(rayShader,"uAspect"),float(w)/float(h));
+    glUniform1f(glGetUniformLocation(rayShader,"uFovRad"),45.0f*Angel::DegreesToRadians);
+    glUniform1f(glGetUniformLocation(rayShader,"uWorldLimit"),300.0f);
+    glUniform1f(glGetUniformLocation(rayShader,"uLightSpeed"),lightSpeed);
+    glUniform1f(glGetUniformLocation(rayShader,"uGravityScale"),gravityK);
 
-    glUniform1i(glGetUniformLocation(rayShader,"uSphereCount"), spheres.size());
-    
-    glUniform1f(glGetUniformLocation(rayShader,"uHitEps"),   0.02f);   // or tweak
-    glUniform1f(glGetUniformLocation(rayShader,"uDepthFar"), 300.0f);  // map s→depth
-    glUniform1f(glGetUniformLocation(rayShader, "uAspect"), float(w) / h);
-    glUniform1i (glGetUniformLocation(rayShader,"uSunIndex"), 0);
-    glUniform3f(glGetUniformLocation(rayShader,"uKd"), 0.8f, 0.8f, 0.8f);
-    glUniform3f(glGetUniformLocation(rayShader,"uKs"), 1.0f, 1.0f, 1.0f);
-    glUniform1f(glGetUniformLocation(rayShader,"uShininess"), 32.0f);
+    glUniform1i(glGetUniformLocation(rayShader,"uSphereCount"),spheres.size());
+    glUniform1f(glGetUniformLocation(rayShader,"uHitEps"),0.02f);
+    glUniform1f(glGetUniformLocation(rayShader,"uDepthFar"),300.0f);
 
-    for(int i=0;i<spheres.size();++i){
-        const auto& P = spheres[i]->getProperties();
-        std::string base = "uSpherePos["  + std::to_string(i) + "]";
-        glUniform3fv(glGetUniformLocation(rayShader, base.c_str()),1,&P.position.x);
+    int sunCount=0, sunIdx[8]={0};
+    switch(currentWorld){
+      case 0: sunCount=1; break;
+      case 1: sunCount=2; sunIdx[1]=1; break;
+      case 2: sunCount=1; break;
+      case 3: sunCount=3; sunIdx[1]=1; sunIdx[2]=2; break;
+    }
+    glUniform1i(glGetUniformLocation(rayShader,"uSunCount"),sunCount);
+    glUniform1iv(glGetUniformLocation(rayShader,"uSunIndices"),sunCount,sunIdx);
 
-        base = "uSphereRad["  + std::to_string(i) + "]";
-        glUniform1f(glGetUniformLocation(rayShader, base.c_str()), P.radius);
+    glUniform3f(glGetUniformLocation(rayShader,"uKd"),0.8f,0.8f,0.8f);
+    glUniform3f(glGetUniformLocation(rayShader,"uKs"),1.0f,1.0f,1.0f);
+    glUniform1f(glGetUniformLocation(rayShader,"uShininess"),32.0f);
 
-        base = "uSphereMass[" + std::to_string(i) + "]";
-        glUniform1f(glGetUniformLocation(rayShader, base.c_str()), P.mass);
+    for(int i=0;i<(int)spheres.size();++i){
+        auto P=spheres[i]->getProperties();
+        std::string s;
+        s="uSpherePos["+std::to_string(i)+"]"; glUniform3fv(glGetUniformLocation(rayShader,s.c_str()),1,&P.position.x);
+        s="uSphereRad["+std::to_string(i)+"]"; glUniform1f (glGetUniformLocation(rayShader,s.c_str()),P.radius);
+        s="uSphereMass["+std::to_string(i)+"]";glUniform1f (glGetUniformLocation(rayShader,s.c_str()),P.mass);
+        s="uSphereTex["+std::to_string(i)+"]";
+        glActiveTexture(GL_TEXTURE0+i); glBindTexture(GL_TEXTURE_2D,textures[i]);
+        glUniform1i(glGetUniformLocation(rayShader,s.c_str()),i);
 
-        base = "uSphereTex["  + std::to_string(i) + "]";
-        glActiveTexture(GL_TEXTURE0+i);
-        glBindTexture(GL_TEXTURE_2D, textures[i]);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glUniform1i(glGetUniformLocation(rayShader, base.c_str()), i);
+        // minimal self-rotation uniforms
+        std::string ax="uRotationAxis["+std::to_string(i)+"]";
+        std::string sp="uRotationSpeed["+std::to_string(i)+"]";
+        glUniform3fv(glGetUniformLocation(rayShader,ax.c_str()),1,&P.rotationAxis.x);
+        glUniform1f (glGetUniformLocation(rayShader,sp.c_str()),P.rotationSpeed);
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  DISPLAY
-// ─────────────────────────────────────────────────────────────────────────────
-static void display(float dt)
-{
-    // ── physics (unchanged) ────────────────────────────────────────────────
-    const float Gs = 1.0f;
-    for(auto* s: spheres) s->computeNetForce();
-    for(auto* s: spheres) s->integrate(dt, Gs);
-
-    // ── camera matrices (for inverse-view) ────────────────────────────────
-    int w, h;
-    glfwGetFramebufferSize(glfwGetCurrentContext(), &w, &h);
-
-    mat4 V = LookAt(vec4(cameraPos,1),
-                    vec4(cameraPos + cameraFront,1),
-                    vec4(cameraUp, 0));
-
-    // ── G-buffer clear & ray pass ─────────────────────────────────────────
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    uploadRayUniforms(w,h, V);
-
+static void display(const Angel::mat4& invView,int w,int h){
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    uploadRayUniforms(w,h,invView);
     glBindVertexArray(fsVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawArrays(GL_TRIANGLES,0,3);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  MAIN
-// ─────────────────────────────────────────────────────────────────────────────
-int main()
-{
-    if(!glfwInit()) return EXIT_FAILURE;
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+int main(){
+    if(!glfwInit())return EXIT_FAILURE;
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,1);
+    glfwWindowHint(GLFW_OPENGL_PROFILE,   GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* win = glfwCreateWindow(800,600,"Free-Roam Spheres",nullptr,nullptr);
-    if(!win){ glfwTerminate(); return EXIT_FAILURE; }
+    GLFWwindow* win=glfwCreateWindow(800,600,"Free-Roam Spheres",nullptr,nullptr);
+    if(!win){glfwTerminate();return EXIT_FAILURE;}
     glfwMakeContextCurrent(win);
-
-    glfwSetKeyCallback(win, keyCallback);
-    glfwSetFramebufferSizeCallback(win, framebufferSizeCallback);
+    glfwSetFramebufferSizeCallback(win,framebufferSizeCallback);
 
     initScene();
 
-    double last = glfwGetTime();
+    bool prevL=false, prevR=false, prevX=false;
+    double last=glfwGetTime();
     while(!glfwWindowShouldClose(win)){
-        double now = glfwGetTime();
-        float  dt  = float(now-last)*0.8f;  last = now;
+        double now=glfwGetTime();
+        float dt=float(now-last);
+        last=now;
 
-        display(dt);
+        // camera
+        Angel::vec3 f=normalize(cameraFront), r=normalize(cross(f,cameraUp));
+        if(glfwGetKey(win,GLFW_KEY_W)==GLFW_PRESS)cameraPos+=f*cameraSpeed*dt;
+        if(glfwGetKey(win,GLFW_KEY_S)==GLFW_PRESS)cameraPos-=f*cameraSpeed*dt;
+        if(glfwGetKey(win,GLFW_KEY_A)==GLFW_PRESS)cameraPos-=r*cameraSpeed*dt;
+        if(glfwGetKey(win,GLFW_KEY_D)==GLFW_PRESS)cameraPos+=r*cameraSpeed*dt;
+        if(glfwGetKey(win,GLFW_KEY_Q)==GLFW_PRESS)cameraPos+=cameraUp*cameraSpeed*dt;
+        if(glfwGetKey(win,GLFW_KEY_E)==GLFW_PRESS)cameraPos-=cameraUp*cameraSpeed*dt;
 
+        // world switch + reset
+        bool cl=glfwGetKey(win,GLFW_KEY_LEFT)==GLFW_PRESS;
+        bool cr=glfwGetKey(win,GLFW_KEY_RIGHT)==GLFW_PRESS;
+        bool cR=glfwGetKey(win,GLFW_KEY_R)==GLFW_PRESS;
+        if(cl&&!prevL){currentWorld=(currentWorld+WORLD_COUNT-1)%WORLD_COUNT;loadWorld(currentWorld);}
+        if(cr&&!prevR){currentWorld=(currentWorld+1)%WORLD_COUNT;loadWorld(currentWorld);}
+        if(cR&&!prevX){cameraPos=cameraPosOrig;cameraFront=cameraFrontOrig;cameraUp=cameraUpOrig;loadWorld(currentWorld);}
+        prevL=cl;prevR=cr;prevX=cR;
+
+        int w,h;glfwGetFramebufferSize(win,&w,&h);if(!h)h=1;if(!w)w=1;glViewport(0,0,w,h);
+        Angel::mat4 V=LookAt(vec4(cameraPos,1),vec4(cameraPos+cameraFront,1),vec4(cameraUp,0));
+        Angel::mat4 invV;for(int i=0;i<3;i++)for(int j=0;j<3;j++)invV[i][j]=V[j][i];
+        Angel::vec3 t(V[0][3],V[1][3],V[2][3]);
+        invV[0][3]=-(invV[0][0]*t.x+invV[0][1]*t.y+invV[0][2]*t.z);
+        invV[1][3]=-(invV[1][0]*t.x+invV[1][1]*t.y+invV[1][2]*t.z);
+        invV[2][3]=-(invV[2][0]*t.x+invV[2][1]*t.y+invV[2][2]*t.z);
+        invV[3][0]=invV[3][1]=invV[3][2]=0;invV[3][3]=1;
+
+        for(auto*s:spheres)s->computeNetForce();
+        for(auto*s:spheres)s->integrate(dt,1.0f);
+
+        display(invV,w,h);
         glfwSwapBuffers(win);
         glfwPollEvents();
     }
-    for(auto* s: spheres) delete s;
+
+    for(auto*s:spheres)delete s;
     glfwDestroyWindow(win);
     glfwTerminate();
     return EXIT_SUCCESS;

@@ -1,54 +1,20 @@
 // callbacks.cpp
 #include "callbacks.h"
-#include "Angel.h"
 #include <GLFW/glfw3.h>
 
-// camera globals
-vec3 cameraPos   = vec3(0.0f, 0.0f,  -50.0f);
-vec3 cameraFront = vec3(0.0f, 0.0f, -1.0f);
-vec3 cameraUp    = vec3(0.0f, 1.0f,  0.0f);
-float cameraSpeed = 20.0f; // units per second
+// Camera globals (defined in callbacks.h)
 
-static double lastTime = 0.0;
-
-void keyCallback(GLFWwindow* window, int key, int, int action, int)
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (action != GLFW_PRESS && action != GLFW_REPEAT) return;
-
-    // get current time
-    double currentTime = glfwGetTime();
-
-    // static so it persists across calls,
-    // initialize to negative to detect “first time”
-    static double lastTime = -1.0;
-    float        delta;
-
-    if (lastTime < 0.0) {
-        // first key‐press: ignore the jump
-        delta = 0.0f;
-    } else {
-        delta = float(currentTime - lastTime);
-    }
-    lastTime = currentTime;
-
-    // now move camera with a sane delta
-    vec3 right = normalize(cross(cameraFront, cameraUp));
-    if (key == GLFW_KEY_W)
-        cameraPos += cameraFront * cameraSpeed * delta;
-    else if (key == GLFW_KEY_S)
-        cameraPos -= cameraFront * cameraSpeed * delta;
-    else if (key == GLFW_KEY_A)
-        cameraPos -= right * cameraSpeed * delta;
-    else if (key == GLFW_KEY_D)
-        cameraPos += right * cameraSpeed * delta;
-    else if (key == GLFW_KEY_Q)
-        cameraPos += cameraUp * cameraSpeed * delta;
-    else if (key == GLFW_KEY_E)
-        cameraPos -= cameraUp * cameraSpeed * delta;
-    else if (key == GLFW_KEY_ESCAPE)
-        glfwSetWindowShouldClose(window, GL_TRUE);
+    // Only handle ESC here; movement is polled per-frame in main.cpp
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
-void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
+void framebufferSizeCallback(GLFWwindow* window, int width, int height)
+{
+    // Prevent division by zero on minimize/restore
+    if (width  == 0) width  = 1;
+    if (height == 0) height = 1;
     glViewport(0, 0, width, height);
 }
