@@ -1,11 +1,9 @@
 // main.cpp  —  Free-Roam Spheres (GPU Ray-traced Version) – Multi-World, Reset & Self‐Rotation
 #include "Angel.h"
 #include "sphere.h"
-#include "callbacks.h"
 #include "ppm_loader.h"
 #include <vector>
 #include <GLFW/glfw3.h>
-#include <string>
 
 // Camera globals
 static Angel::vec3 cameraPosOrig(0.0f, 5.0f, -30.0f);
@@ -57,9 +55,9 @@ static void loadWorld(int w) {
     // spheres
     switch(w) {
         case 0:
-            spheres.push_back(new Sphere(20,{2.0f,{0,0,0},{0},{0,1,0},5.0f,10000.0f},&spheres));
-            spheres.push_back(new Sphere(20,{1.0f,{20,0,0},{0,0,15},{0,1,0},30.0f,1.0f},&spheres));
-            spheres.push_back(new Sphere(20,{0.5f,{25,0,0},{0,0,18},{0,1,0},60.0f,0.01f},&spheres));
+            spheres.push_back(new Sphere({2.0f,{0,0,0},{0},{0,1,0},5.0f,10000.0f},&spheres));
+            spheres.push_back(new Sphere({1.0f,{20,0,0},{0,0,15},{0,1,0},30.0f,1.0f},&spheres));
+            spheres.push_back(new Sphere({0.5f,{25,0,0},{0,0,18},{0,1,0},60.0f,0.01f},&spheres));
             break;
         case 1: {
             // two suns in a tighter binary, Earth in a stable circumbinary orbit
@@ -70,13 +68,11 @@ static void loadWorld(int w) {
 
             // Sun A at (−a,−a,0), velocity perpendicular in XY plane
             spheres.push_back(new Sphere(
-                20,
                 { 2.5f, { -a, -a, 0 }, {  vdiag, 0.0f, -vdiag }, { 0,1,0 }, 5.0f, M },
                 &spheres
             ));
             // Sun B at (+a,+a,0), opposite velocity
             spheres.push_back(new Sphere(
-                20,
                 { 2.5f, {  a,  a, 0 }, { -vdiag, 0.0f,  vdiag }, { 0,1,0 }, 5.0f, M },
                 &spheres
             ));
@@ -85,17 +81,16 @@ static void loadWorld(int w) {
             const float Re = 4.0f * a;                           // =20
             const float ve = sqrt(2.0f * M / Re);                // ≈28.3
             spheres.push_back(new Sphere(
-                20,
                 { 1.0f, { Re, 0.0f, 0.0f }, { 0.0f, 0.0f, ve }, { 0,1,0 }, 30.0f, 1.0f },
                 &spheres
             ));
         } break;
         case 2:
-            spheres.push_back(new Sphere(20,{3.0f,{0,0,0},{0},{0,1,0},5.0f,10000.0f},&spheres));
+            spheres.push_back(new Sphere({3.0f,{0,0,0},{0},{0,1,0},5.0f,10000.0f},&spheres));
             { const float R=20.0f,v=12.0f; float ang[4]={0,1.5708f,3.1416f,4.7124f};
               for(int i=0;i<4;++i){
                 float x=R*cos(ang[i]), z=R*sin(ang[i]);
-                spheres.push_back(new Sphere(20,{1.0f,{x,0,z},{ v*z/R,0,-v*x/R},{0,1,0},30.0f,1.0f},&spheres));
+                spheres.push_back(new Sphere({1.0f,{x,0,z},{ v*z/R,0,-v*x/R},{0,1,0},30.0f,1.0f},&spheres));
               }
             } break;
         case 3: {
@@ -105,7 +100,7 @@ static void loadWorld(int w) {
                 Angel::vec3 p={posX[i],0,posZ[i]};
                 Angel::vec3 tang=normalize(cross({0,1,0},p));
                 Angel::vec3 vel=tang*v;
-                spheres.push_back(new Sphere(20,{2.5f,p,{vel.x,vel.y,vel.z},{0,1,0},5.0f,9000.0f},&spheres));
+                spheres.push_back(new Sphere({2.5f,p,{vel.x,vel.y,vel.z},{0,1,0},5.0f,9000.0f},&spheres));
             }
         } break;
     }
@@ -188,13 +183,27 @@ static void display(const Angel::mat4& invView,int w,int h){
     glDrawArrays(GL_TRIANGLES,0,3);
 }
 
+
+void framebufferSizeCallback(GLFWwindow* window, int width, int height)
+{
+    // Prevent division by zero on minimize/restore
+    if (width  == 0) width  = 1;
+    if (height == 0) height = 1;
+    glViewport(0, 0, width, height);
+}
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
+
 int main(){
     if(!glfwInit())return EXIT_FAILURE;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,1);
     glfwWindowHint(GLFW_OPENGL_PROFILE,   GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* win=glfwCreateWindow(800,600,"Free-Roam Spheres",nullptr,nullptr);
+    GLFWwindow* win=glfwCreateWindow(800,600,"Skewed-Space",nullptr,nullptr);
     if(!win){glfwTerminate();return EXIT_FAILURE;}
     glfwMakeContextCurrent(win);
     glfwSetFramebufferSizeCallback(win,framebufferSizeCallback);
@@ -216,6 +225,7 @@ int main(){
         if(glfwGetKey(win,GLFW_KEY_D)==GLFW_PRESS)cameraPos+=r*cameraSpeed*dt;
         if(glfwGetKey(win,GLFW_KEY_Q)==GLFW_PRESS)cameraPos+=cameraUp*cameraSpeed*dt;
         if(glfwGetKey(win,GLFW_KEY_E)==GLFW_PRESS)cameraPos-=cameraUp*cameraSpeed*dt;
+        
 
         // world switch + reset
         bool cl=glfwGetKey(win,GLFW_KEY_LEFT)==GLFW_PRESS;

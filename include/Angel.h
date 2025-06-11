@@ -20,8 +20,6 @@
 namespace Angel {
 
     GLuint InitShader(const char* vertexShaderFile, const char* fragmentShaderFile);
-GLuint InitShader2(const char* vertexShaderFile,
-                   const char* fragmentShaderFile);
 
     const GLfloat DegreesToRadians = M_PI / 180.0;
     const GLfloat DivideByZeroTolerance = 1.0e-07f;

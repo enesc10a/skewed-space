@@ -1,4 +1,4 @@
-// shaders/raytracer.glsl  —  Modified for self-rotation
+// shaders/raytracer.glsl 
 #version 410 core
 precision highp float;
 
