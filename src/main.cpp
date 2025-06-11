@@ -22,8 +22,8 @@ static GLuint textures[8] = {0}, texSun = 0, texEarth = 0, texMoon = 0,texNeutro
 static GLuint rayShader = 0, fsVAO = 0;
 
 // Simulation params
-static float lightSpeed = 18.1f;
-static float gravityK   = 0.05f;
+static float lightSpeed = 10.1f;
+static float gravityK   = 0.0025f;
 
 // World selector
 static int currentWorld = 0;
@@ -141,13 +141,13 @@ static void uploadRayUniforms(int w,int h,const Angel::mat4& invView){
 
     glUniform1f(glGetUniformLocation(rayShader,"uAspect"),float(w)/float(h));
     glUniform1f(glGetUniformLocation(rayShader,"uFovRad"),45.0f*Angel::DegreesToRadians);
-    glUniform1f(glGetUniformLocation(rayShader,"uWorldLimit"),300.0f);
+    glUniform1f(glGetUniformLocation(rayShader,"uWorldLimit"),200.0f);
     glUniform1f(glGetUniformLocation(rayShader,"uLightSpeed"),lightSpeed);
     glUniform1f(glGetUniformLocation(rayShader,"uGravityScale"),gravityK);
 
     glUniform1i(glGetUniformLocation(rayShader,"uSphereCount"),spheres.size());
     glUniform1f(glGetUniformLocation(rayShader,"uHitEps"),0.02f);
-    glUniform1f(glGetUniformLocation(rayShader,"uDepthFar"),300.0f);
+    glUniform1f(glGetUniformLocation(rayShader,"uDepthFar"),200.0f);
 
     int sunCount=0, sunIdx[8]={0};
     switch(currentWorld){
