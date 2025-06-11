@@ -3,7 +3,7 @@
 precision highp float;
 
 const int   MAX_SPHERES = 8;
-const int   MAX_STEPS   = 30;
+const int   MAX_STEPS   = 20;
 const float STEP_FACTOR = 0.15;
 const float MAX_DT      = 1.0;
 
