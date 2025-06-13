@@ -3,7 +3,7 @@
 precision highp float;
 
 const int   MAX_SPHERES = 8;
-const int   MAX_STEPS   = 20;
+const int   MAX_STEPS   = 30;
 const float STEP_FACTOR = 0.15;
 const float MAX_DT      = 1.0;
 
@@ -29,6 +29,11 @@ uniform vec3  uRotationAxis[MAX_SPHERES];
 uniform float uRotationSpeed[MAX_SPHERES];
 
 out vec4 fragColor;
+
+float computeTimeStep(vec3 pos) {
+    float dtRaw = length(pos) * length(pos) * STEP_FACTOR;
+    return clamp(dtRaw, 0.2, MAX_DT); // lower cap: 0.0001, upper cap: MAX_DT
+}
 
 mat3 axisAngleMat(vec3 axis,float a){
     float c=cos(a), s=sin(a);
@@ -81,7 +86,7 @@ void main(){
 
     for(int i=0;i<MAX_STEPS;++i){
         if(length(pos)>uWorldLimit) break;
-        float dt=min(length(pos)*length(pos)*STEP_FACTOR,MAX_DT);
+        float dt = computeTimeStep(pos);
         vec3 next=pos+vel*dt;
         if(segSphere(pos,next,hit,tHit)){
             pos=mix(pos,next,tHit);

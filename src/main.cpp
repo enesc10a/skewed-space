@@ -23,7 +23,7 @@ static GLuint rayShader = 0, fsVAO = 0;
 
 // Simulation params
 static float lightSpeed = 10.1f;
-static float gravityK   = 0.0025f;
+static float gravityK   = 0.025f;
 
 // World selector
 static int currentWorld = 0;
@@ -140,7 +140,7 @@ static void uploadRayUniforms(int w,int h,const Angel::mat4& invView){
     glUniform3fv(glGetUniformLocation(rayShader,"uCamForward"),1,&f.x);
 
     glUniform1f(glGetUniformLocation(rayShader,"uAspect"),float(w)/float(h));
-    glUniform1f(glGetUniformLocation(rayShader,"uFovRad"),45.0f*Angel::DegreesToRadians);
+    glUniform1f(glGetUniformLocation(rayShader,"uFovRad"),90.0f*Angel::DegreesToRadians);
     glUniform1f(glGetUniformLocation(rayShader,"uWorldLimit"),200.0f);
     glUniform1f(glGetUniformLocation(rayShader,"uLightSpeed"),lightSpeed);
     glUniform1f(glGetUniformLocation(rayShader,"uGravityScale"),gravityK);
